@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Job Resource Usage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-200 p-6">
+<div class="max-w-6xl mx-auto">
+  <h1 class="text-2xl font-semibold text-indigo-400 mb-4">
+    Job Resource Usage
+  </h1>
+
+  <canvas id="chart" height="120"></canvas>
+</div>
+
+<script>
+const JOB_ID = "{{ job_id }}";
+
+fetch(`/api/job/${JOB_ID}/metrics`)
+  .then(r => r.json())
+  .then(resp => {
+    const points = resp.metrics || [];
+    if (!points.length) {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        "<p class='text-slate-400 mt-4'>No metrics recorded.</p>"
+      );
+      return;
+    }
+
+    const labels = points.map(p => p.t_ms);
+    const cpu = points.map(p => p.cpu_job ?? 0);
+    const ram = points.map(p => p.ram_job_mb ?? 0);
+    const disk = points.map(p => p.disk_mb ?? 0);
+
+    new Chart(document.getElementById("chart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "CPU (%)",
+            data: cpu,
+            borderColor: "#6366f1",
+            tension: 0.25
+          },
+          {
+            label: "RAM (MB)",
+            data: ram,
+            borderColor: "#22c55e",
+            tension: 0.25
+          },
+          {
+            label: "Disk I/O (MB)",
+            data: disk,
+            borderColor: "#f59e0b",
+            tension: 0.25
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: {
+            title: { display: true, text: "Time (ms)" }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: "Usage" }
+          }
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>
+

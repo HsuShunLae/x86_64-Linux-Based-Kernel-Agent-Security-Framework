@@ -1,0 +1,13 @@
+# /etc/systemd/system/policy.service
+[Unit]
+Description=Policy Enforcement Daemon
+
+[Service]
+ExecStart=/usr/local/bin/policy-daemon
+Restart=always
+LimitMEMLOCK=infinity
+CapabilityBoundingSet=CAP_BPF CAP_SYS_ADMIN CAP_SYS_RESOURCE CAP_DAC_READ_SEARCH
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

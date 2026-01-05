@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Policy Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-200 min-h-screen p-6">
+
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold text-indigo-400">
+      Final Syscall Policies
+    </h1>
+    <a href="/" class="text-sm text-indigo-300 hover:underline">
+      <- Back
+    </a>
+  </div>
+
+  <div class="grid grid-cols-12 gap-6">
+
+    <!-- LEFT: Application List -->
+    <div class="col-span-3 bg-slate-800 rounded-xl p-4 border border-slate-700">
+      <h2 class="text-sm font-semibold text-slate-300 mb-3">
+        Applications
+      </h2>
+      <div id="appList" class="space-y-1 text-sm"></div>
+    </div>
+
+    <!-- RIGHT: Policy Viewer -->
+    <div class="col-span-9 bg-slate-800 rounded-xl p-5 border border-slate-700">
+      <div id="policyPane" class="text-slate-400 text-sm">
+        Select an application to view its policy.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let policies = {};
+let selectedApp = null;
+
+function summaryCard(label, value) {
+  return `
+    <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 text-center">
+      <div class="text-xs text-slate-400">${label}</div>
+      <div class="text-xl font-semibold text-indigo-400">${value}</div>
+    </div>`;
+}
+
+function table(headers, rows) {
+  return `
+    <table class="w-full text-sm border border-slate-700">
+      <thead class="bg-slate-700">
+        <tr>
+          ${headers.map(h => `<th class="px-3 py-2 text-left">${h}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr class="border-t border-slate-700">
+            ${r.map(c => `<td class="px-3 py-2">${c}</td>`).join("")}
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderAppList() {
+  const box = document.getElementById("appList");
+  box.innerHTML = "";
+
+  Object.keys(policies).forEach(app => {
+    const item = document.createElement("div");
+    item.textContent = app;
+    item.className =
+      "cursor-pointer px-3 py-2 rounded border border-slate-700 " +
+      "hover:bg-slate-700 hover:border-indigo-500";
+
+    item.onclick = () => selectApp(app);
+
+    if (app === selectedApp) {
+      item.classList.add("bg-slate-700", "border-indigo-500");
+    }
+
+    box.appendChild(item);
+  });
+}
+
+function selectApp(app) {
+  selectedApp = app;
+  renderAppList();
+  renderPolicy(app);
+}
+
+function renderPolicy(app) {
+  const p = policies[app];
+  const pane = document.getElementById("policyPane");
+
+  if (!p) return;
+
+ 
+  const countMap = {};
+  p.syscall_counts.forEach(s => countMap[s.id] = s.count);
+
+  const allowed = p.allowed_syscalls
+    .map(s => ({
+      id: s.id,
+      name: s.name,
+      count: countMap[s.id] || 0
+    }))
+    .sort((a,b) => b.count - a.count);
+
+  pane.innerHTML = `
+    <h2 class="text-xl font-semibold text-indigo-400 mb-4">
+      ${app}
+    </h2>
+
+    <div class="grid grid-cols-3 gap-4 mb-6 w-full">
+	  <div class="w-full">
+	    ${summaryCard("Allowed Syscalls", p.summary.allowed_syscalls)}
+	  </div>
+	  <div class="w-full">
+	    ${summaryCard("Entry Syscalls", p.summary.entry_syscalls)}
+	  </div>
+	  <div class="w-full">
+	    ${summaryCard("Total Transitions", p.summary.total_transitions)}
+	  </div>
+	</div>
+
+
+    <div class="mb-8">
+	  <h3 class="text-sm font-semibold mb-2">
+	    Allowed Syscalls 
+	  </h3>
+
+	  <div class="max-h-[420px] overflow-y-auto border border-slate-700 rounded">
+	    ${table(
+	      ["#", "Syscall ID", "Name", "Count"],
+	      allowed.map((s, idx) => [
+		idx + 1,      // unique allowed syscall index
+		s.id,
+		s.name,
+		s.count
+	      ])
+	    )}
+	  </div>
+	</div>
+
+
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="text-sm font-semibold mb-2">Entry Syscalls</h3>
+        ${table(
+          ["ID", "Name"],
+          p.entry_syscalls.map(s => [s.id, s.name])
+        )}
+      </div>
+
+      <div>
+	  <h3 class="text-sm font-semibold mb-2">
+	    All Transitions 
+	  </h3>
+
+	  <div class="max-h-[420px] overflow-y-auto border border-slate-700 rounded">
+	    ${table(
+	      ["#", "From -> To", "Count"],
+	      p.transition_counts
+		.sort((a, b) => b.count - a.count) 
+		.map((t, idx) => [
+		  idx + 1,                         
+		  `${t.from_name} -> ${t.to_name}`,
+		  t.count
+		])
+	    )}
+	  </div>
+	</div>
+
+    </div>
+  `;
+}
+
+fetch("/api/policies")
+  .then(r => r.json())
+  .then(data => {
+    policies = data;
+    renderAppList();
+  });
+</script>
+
+</body>
+</html>
+

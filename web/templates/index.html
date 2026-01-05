@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Policy Pipeline UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-900 text-slate-200 min-h-screen p-6">
+  <div class="max-w-7xl mx-auto grid grid-cols-12 gap-6">
+
+    <!-- LEFT -->
+    <div class="col-span-4 bg-slate-800 rounded-xl shadow-lg p-5">
+      <div class="flex items-center justify-between mb-1">
+	  <h1 class="text-2xl font-semibold text-indigo-400">Pipeline UI</h1>
+
+	  <a href="/policies"
+	     class="text-xs text-indigo-300 hover:text-indigo-400
+		    border border-indigo-500/30 rounded px-2 py-1">
+	    View Policies
+	  </a>
+	  <a href="/metrics"
+		   class="text-sm text-indigo-400 hover:underline">
+		   View Pipeline Metrics
+		</a>
+
+	</div>
+
+	<p class="text-sm text-slate-400 mb-5">
+	  UI controller for add / list / remove / scan using bash pipeline.
+	</p>
+
+      <!-- Add -->
+      <div class="mb-4">
+        <label class="block text-xs text-slate-400 mb-2">Add executable path</label>
+        <div class="flex gap-2">
+          <input id="addPath"
+                 class="flex-1 bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm"
+                 placeholder="/bin/ls" />
+          <button onclick="addApp()"
+                  class="bg-indigo-600 hover:bg-indigo-700 rounded-md px-4 py-2 text-sm">
+            Add
+          </button>
+        </div>
+        <div id="addMsg" class="text-xs text-slate-400 mt-2"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex gap-2 mb-4">
+        <button onclick="refreshApps()"
+                class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-md py-2 text-sm">
+          List
+        </button>
+        <button onclick="scanAll()"
+                class="flex-1 bg-indigo-700 hover:bg-indigo-600 rounded-md py-2 text-sm">
+          Scan --all
+        </button>
+      </div>
+      
+
+      <!-- Apps -->
+      <div class="border-t border-slate-700 pt-4">
+        <h2 class="text-sm font-semibold mb-2">Registered apps</h2>
+        <div id="apps" class="space-y-2 text-sm"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col-span-8 bg-slate-800 rounded-xl shadow-lg p-5">
+      <div class="flex justify-between mb-3">
+        <h2 class="text-xl font-semibold text-indigo-400">Jobs</h2>
+        <div class="text-xs text-slate-400">Click job to view output</div>
+      </div>
+
+      <div id="jobs" class="space-y-2 mb-4"></div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-xs text-slate-400 mb-2">stdout_tail</div>
+          <pre id="stdout"
+               class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs h-56 overflow-auto"></pre>
+        </div>
+        <div>
+          <div class="text-xs text-slate-400 mb-2">stderr_tail</div>
+          <pre id="stderr"
+               class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs h-56 overflow-auto"></pre>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="text-xs text-slate-400 mb-2">Policy JSON</div>
+        <pre id="policy"
+             class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs h-[420px] overflow-auto"></pre>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+let selectedJob = null;
+let jobs = {};
+
+function setText(id, txt) {
+  document.getElementById(id).textContent = txt || "";
+}
+
+function addApp() {
+  const path = addPath.value.trim();
+  if (!path) return;
+
+  fetch("/api/add", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "path=" + encodeURIComponent(path)
+  })
+  .then(r => r.json())
+  .then(d => {
+    addMsg.textContent = d.ok ? (d.output || "Added.") : (d.error || "Failed.");
+    refreshApps();
+  });
+}
+
+function refreshApps() {
+  fetch("/api/list")
+    .then(r => r.json())
+    .then(d => renderApps(d.apps || []));
+}
+
+function renderApps(apps) {
+  const box = document.getElementById("apps");
+  box.innerHTML = "";
+
+  if (!apps.length) {
+    box.innerHTML = `<div class="text-xs text-slate-400">No apps registered.</div>`;
+    return;
+  }
+
+  apps.forEach(name => {
+    const row = document.createElement("div");
+    row.className =
+      "flex justify-between items-center bg-slate-900 border border-slate-700 rounded-md px-3 py-2";
+    row.innerHTML = `
+      <div class="font-mono text-xs truncate">${name}</div>
+      <div class="flex gap-2">
+        <button class="text-xs bg-indigo-600 px-3 py-1 rounded"
+                onclick="scanOne('${name}')">Scan</button>
+        <button class="text-xs bg-slate-700 px-3 py-1 rounded"
+                onclick="removeApp('${name}')">Remove</button>
+      </div>`;
+    box.appendChild(row);
+  });
+}
+
+function removeApp(name) {
+  fetch("/api/remove", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "name=" + encodeURIComponent(name)
+  }).then(refreshApps);
+}
+
+function scanOne(name) {
+  const args = prompt(`Enter runtime arguments for "${name}"`);
+  if (!args || !args.trim()) {
+    alert("Arguments are required.");
+    return;
+  }
+
+  fetch("/api/scan", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body:
+      "name=" + encodeURIComponent(name) +
+      "&args=" + encodeURIComponent(args)
+  })
+  .then(r => r.json())
+  .then(d => {
+    addJobCard(d.job_id, `scan ${name} ${args}`);
+    pollJob(d.job_id);
+  });
+}
+
+function scanAll() {
+  const args = prompt("Enter runtime arguments for scan --all");
+  if (!args || !args.trim()) {
+    alert("Arguments are required.");
+    return;
+  }
+
+  fetch("/api/scan_all", {
+    method: "POST",
+    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+    body: "args=" + encodeURIComponent(args)
+  })
+  .then(r => r.json())
+  .then(d => {
+    addJobCard(d.job_id, `scan --all ${args}`);
+    pollJob(d.job_id);
+  });
+}
+
+function addJobCard(jobId, label) {
+  jobs[jobId] = { status: "queued", label };
+
+  const row = document.createElement("div");
+  row.id = "job-" + jobId;
+  row.className =
+    "cursor-pointer bg-slate-900 border border-slate-700 rounded-md px-3 py-2 hover:border-indigo-500 transition";
+
+  row.onclick = () => {
+    if (jobs[jobId].status === "done") {
+      window.location.href = `/job/${jobId}/metrics`;
+    } else {
+      selectJob(jobId);
+    }
+  };
+
+  row.innerHTML = `
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="text-xs text-slate-400">${label}</div>
+      <div class="font-mono text-xs">${jobId}</div>
+    </div>
+    <div class="flex gap-2">
+      <span class="status text-indigo-400">queued</span>
+      <button class="stop-btn text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
+		onclick="event.stopPropagation(); stopJob('${jobId}')">
+	  Stop
+	</button>
+
+    </div>
+  </div>`;
+
+
+  document.getElementById("jobs").prepend(row);
+  selectJob(jobId);
+}
+
+
+function setJobStatus(jobId, status) {
+  jobs[jobId].status = status;
+
+  const row = document.getElementById("job-" + jobId);
+  if (!row) return;
+
+  const statusEl = row.querySelector(".status");
+  const stopBtn = row.querySelector(".stop-btn");
+
+  if (statusEl) statusEl.textContent = status;
+
+  if (status === "done" || status === "failed" || status === "stopped") {
+    if (stopBtn) stopBtn.style.display = "none";
+  } else {
+    if (stopBtn) stopBtn.style.display = "inline-block";
+  }
+
+  if (status === "done") {
+    row.classList.add("border-indigo-500");
+    row.title = "Click to view resource usage metrics";
+  }
+}
+
+
+
+function selectJob(jobId) {
+  selectedJob = jobId;
+  setText("stdout", "");
+  setText("stderr", "");
+  setText("policy", "Loading…");
+  fetchJob(jobId);
+}
+
+function pollJob(jobId) {
+  const t = setInterval(() => {
+    fetchJob(jobId).then(st => {
+      if (st === "done" || st === "failed" || st === "stopped") clearInterval(t);
+    });
+  }, 1000);
+}
+
+async function fetchJob(jobId) {
+  const r = await fetch("/api/job/" + jobId);
+  const d = await r.json();
+
+  setJobStatus(jobId, d.status);
+
+  /* render for selected job */
+  if (selectedJob === jobId) {
+    setText("stdout", d.stdout_tail || "");
+    setText("stderr", d.stderr_tail || "");
+
+    if (d.status === "done") {
+      setText("policy", JSON.stringify(d.results || {}, null, 2));
+    } else if (d.status === "failed") {
+      setText("policy", "Job failed. Check stderr.");
+    } else {
+      setText("policy", "Job is " + d.status + " …");
+    }
+  }
+
+  return d.status;
+}
+function stopJob(jobId) {
+  if (!confirm("Stop this job?")) return;
+
+  fetch(`/api/job/${jobId}/stop`, { method: "POST" })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        alert(d.error || "Failed to stop job");
+        return;
+      }
+      setJobStatus(jobId, "stopped");
+    });
+}
+
+
+refreshApps();
+</script>
+
+</body>
+</html>
+
