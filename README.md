@@ -137,10 +137,14 @@ sudo ./myagent-reg.sh
 ```bash
 python3 app.py
 ```
+<img width="1318" height="751" alt="image" src="https://github.com/user-attachments/assets/94e628c7-2278-4d0a-9c6e-d9a6720bd104" />
 
    * Allowed syscalls with counts
    * Entry syscalls
    * Syscall Transitioins with counts
+
+<img width="1249" height="845" alt="image" src="https://github.com/user-attachments/assets/63c6a574-3a12-4451-a103-90f1853ec5fb" />
+
 
 This policy represents the **baseline behaviour** of the application.
 
