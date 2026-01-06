@@ -37,6 +37,7 @@ project_root/
 │   ├── policy_parser.c
 │   ├── policy_parser.h
 │   ├── policy-daemon.c
+│   ├── policy.service
 │   ├── ebpf_policy.bpf.c
 │   ├── ebpf_helper.h
 │   ├── seccomp_launcher.c
