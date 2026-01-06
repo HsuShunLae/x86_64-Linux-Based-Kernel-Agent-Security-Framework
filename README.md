@@ -23,6 +23,9 @@ Behavioural deviations are **detective only**, whereas **enforcement is strictly
 ---
 
 ## 3. System Architecture
+<img width="1179" height="653" alt="image" src="https://github.com/user-attachments/assets/830b8963-7604-4af8-b468-f1ee36f03d7e" />
+
+That policy generation + layered enforcer
 
 ---
 
