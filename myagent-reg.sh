@@ -102,13 +102,13 @@ scan_one() {
 
   # ---- MERGE ----
   if [[ -f "$out" ]]; then
-    # Existing policy → cumulative merge
+    # cumulative merge
     "$PYTHON" "$MERGER_CUMULATIVE" \
       --policy-a "$out" \
       --policy-b "$d" \
       --out "$tmp"
   else
-    # First run → bootstrap
+    # bootstrap
     "$PYTHON" "$MERGER_BOOTSTRAP" \
       --policy-a "$s" \
       --policy-b "$d" \
